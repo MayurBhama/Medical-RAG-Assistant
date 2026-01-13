@@ -1,0 +1,15 @@
+# Core Framework
+langchain
+langchain-ollama
+langchain-huggingface
+
+# Vector Database
+chromadb
+sentence-transformers
+
+# Medical Data
+biopython
+
+# Web UI
+streamlit
+python-dotenv
