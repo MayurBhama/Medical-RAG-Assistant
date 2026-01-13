@@ -2,6 +2,7 @@
 langchain
 langchain-ollama
 langchain-huggingface
+langchain_community
 
 # Vector Database
 chromadb
