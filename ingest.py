@@ -7,12 +7,12 @@ import os
 def build_vector_db(query):
     #Fetching data from utils.py
     print(f"Fetching research for: {query}...")
-    raw_text = fetch_pubmed_abstracts(query , max_results = 10)
+    raw_text = fetch_pubmed_abstracts(query , max_results = 25)
 
     #Splitting text into chunks 
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size = 600, 
-        chunk_overlap = 50,
+        chunk_size = 1000, 
+        chunk_overlap = 200,
         separators = ["\n\n", "\n", " ", ""]
     )
 
@@ -31,7 +31,3 @@ def build_vector_db(query):
     )
 
     print("Memory created and saved in 'medical_db' folder!")
-
-if __name__ == "__main__":
-    # Test by building a memory about a specific topic
-    build_vector_db("Immunotherapy for lung cancer 2024")

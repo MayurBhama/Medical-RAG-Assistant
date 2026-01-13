@@ -2,7 +2,10 @@
 langchain
 langchain-ollama
 langchain-huggingface
-langchain_community
+langchain-community
+langchain-text-splitters
+langchain-classic
+langchain-core
 
 # Vector Database
 chromadb
@@ -11,6 +14,13 @@ sentence-transformers
 # Medical Data
 biopython
 
+# ML Backend
+tf-keras
+
 # Web UI
 streamlit
 python-dotenv
+
+# Evaluation
+ragas
+datasets

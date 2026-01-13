@@ -1,0 +1,226 @@
+================================================================================
+           MEDICAL RAG ASSISTANT - PROJECT ARCHITECTURE & FLOW
+================================================================================
+
+PROJECT OVERVIEW
+----------------
+A Medical Research Assistant that uses RAG (Retrieval-Augmented Generation) to 
+answer medical questions using PubMed research papers. Built with LangChain, 
+Ollama (Llama 3.1:8b), and ChromaDB.
+
+
+================================================================================
+                              SYSTEM COMPONENTS
+================================================================================
+
+1. DATA INGESTION LAYER
+   - utils.py: Fetches research abstracts from PubMed API using Biopython
+   - ingest.py: Splits documents into chunks and stores in ChromaDB vector database
+   - ingest_all.py: Batch ingestion for multiple medical topics
+
+2. RAG PIPELINE
+   - core.py: Main RAG chain using LangChain LCEL (LangChain Expression Language)
+   - Uses HuggingFace embeddings (all-MiniLM-L6-v2) for semantic search
+   - ChromaDB for vector storage and retrieval
+
+3. AGENT LAYER  
+   - tools.py: LangChain tools wrapping core functions
+   - agent.py: ReAct agent that orchestrates tools and provides fallback logic
+
+4. USER INTERFACE
+   - app.py: Streamlit web interface for chat and research ingestion
+
+5. EVALUATION
+   - evaluate.py: RAGAS framework for evaluating RAG performance
+
+
+================================================================================
+                           DETAILED DATA FLOW
+================================================================================
+
+USER ASKS A QUESTION
+         |
+         v
++------------------+
+|   app.py         |  <-- Streamlit UI captures user input
+|   (Streamlit)    |
++------------------+
+         |
+         v
++------------------+
+|   agent.py       |  <-- ReAct Agent receives question
+|   (LangChain)    |
++------------------+
+         |
+         |  Agent decides which tool to use:
+         |  - query_medical_knowledge (for existing data)
+         |  - search_pubmed (for new research)
+         |  - ingest_new_research (to add new papers)
+         |
+         v
++------------------+
+|   tools.py       |  <-- Tool wrapper functions
++------------------+
+         |
+         +--------> query_medical_knowledge() 
+         |                    |
+         |                    v
+         |          +------------------+
+         |          |   core.py        |  <-- RAG Pipeline
+         |          +------------------+
+         |                    |
+         |                    v
+         |          +------------------+
+         |          |   ChromaDB       |  <-- Vector Database
+         |          |   (medical_db/)  |      with embedded documents
+         |          +------------------+
+         |                    |
+         |                    v
+         |          [Retrieves top-k relevant chunks]
+         |                    |
+         |                    v
+         |          +------------------+
+         |          |   Ollama LLM     |  <-- Generates answer from context
+         |          |   (llama3.1:8b)  |
+         |          +------------------+
+         |                    |
+         |                    v
+         |          [Returns grounded answer]
+         |
+         +--------> search_pubmed()
+         |                    |
+         |                    v
+         |          +------------------+
+         |          |   utils.py       |  <-- Fetches from PubMed API
+         |          |   (Biopython)    |
+         |          +------------------+
+         |                    |
+         |                    v
+         |          [Returns abstracts from PubMed]
+         |
+         +--------> ingest_new_research()
+                              |
+                              v
+                    +------------------+
+                    |   ingest.py      |  <-- Ingests new papers
+                    +------------------+
+                              |
+                              v
+                    +------------------+
+                    |   Text Splitter  |  <-- Chunks documents
+                    |   (1000 chars,   |      (overlap: 200)
+                    |    200 overlap)  |
+                    +------------------+
+                              |
+                              v
+                    +------------------+
+                    |   HuggingFace    |  <-- Creates embeddings
+                    |   Embeddings     |
+                    +------------------+
+                              |
+                              v
+                    +------------------+
+                    |   ChromaDB       |  <-- Stores vectors
+                    +------------------+
+
+
+================================================================================
+                        FALLBACK MECHANISM (agent.py)
+================================================================================
+
+When the Agent fails to find an answer:
+
+1. AGENT ATTEMPT
+   - Agent tries to reason and select appropriate tool
+   - May hit "iteration limit" if LLM struggles with ReAct format
+   
+2. DIRECT RAG FALLBACK
+   - If agent fails, directly query ChromaDB via core.py
+   - If RAG says "cannot find information", continue to next fallback
+   
+3. PUBMED SEARCH FALLBACK
+   - Automatically search PubMed for the original query
+   - Use direct LLM call to summarize search results
+   - Return summarized answer to user
+
+
+================================================================================
+                              FILE STRUCTURE
+================================================================================
+
+Medical-RAG-Assistant/
+├── app.py              # Streamlit web interface
+├── agent.py            # LangChain ReAct agent with fallback logic
+├── core.py             # RAG chain (retriever + LLM)
+├── tools.py            # LangChain tool wrappers
+├── utils.py            # PubMed API utilities (Biopython)
+├── ingest.py           # Document ingestion to ChromaDB
+├── ingest_all.py       # Batch ingestion script
+├── evaluate.py         # RAGAS evaluation script
+├── requirements.txt    # Python dependencies
+├── medical_db/         # ChromaDB vector database (gitignored)
+├── .gitignore          # Git ignore rules
+└── README.md           # Project documentation
+
+
+================================================================================
+                           KEY TECHNOLOGIES
+================================================================================
+
+- LangChain (langchain-classic, langchain-core, langchain-ollama)
+- Ollama with Llama 3.1:8b model
+- ChromaDB for vector storage
+- HuggingFace Embeddings (all-MiniLM-L6-v2)
+- Biopython for PubMed API access
+- Streamlit for web UI
+- RAGAS for evaluation
+
+
+================================================================================
+                          CONFIGURATION PARAMETERS
+================================================================================
+
+INGESTION (ingest.py):
+- chunk_size: 1000 characters
+- chunk_overlap: 200 characters
+- max_results from PubMed: 25 papers
+
+RETRIEVAL (core.py):
+- k (number of chunks retrieved): 5
+- Embedding model: all-MiniLM-L6-v2
+
+AGENT (agent.py):
+- max_iterations: 15
+- handle_parsing_errors: True
+- temperature: 0 (deterministic)
+
+
+================================================================================
+                              GUARDRAILS
+================================================================================
+
+The system includes strict guardrails:
+1. Answers ONLY from provided medical context
+2. Rejects general knowledge questions (capitals, history, etc.)
+3. Rejects creative writing requests (poems, stories, etc.)
+4. Falls back to PubMed search when local knowledge is insufficient
+
+
+================================================================================
+                         RAGAS EVALUATION METRICS
+================================================================================
+
+The system is evaluated using RAGAS framework:
+- Faithfulness: How grounded is the answer in the context?
+- Answer Relevancy: How relevant is the answer to the question?
+- Context Precision: How precise is the retrieved context?
+- Context Recall: How much of the ground truth is covered?
+
+Latest Results:
+- Answer Relevancy: ~0.86
+- Faithfulness: ~0.80
+
+
+================================================================================
+                                 END
+================================================================================
